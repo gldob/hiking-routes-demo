@@ -26,7 +26,9 @@ ALLOWED_HOSTS = [
     if host.strip()
 ]
 
-INSTALLED_APPS = []
+INSTALLED_APPS = [
+    "routes",
+]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
