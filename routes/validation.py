@@ -30,11 +30,13 @@ def validate_route(data):
     name = _required_text(data, "name", 200, errors)
     region = _required_text(data, "region", 100, errors)
 
-    distance_km = data.get("distance_km")
-    if not _is_number(distance_km):
-        errors["distance_km"] = "Must be a number."
-    elif distance_km < 0:
-        errors["distance_km"] = "Must not be negative."
+    distance = data.get("distance")
+    if "distance_km" in data:
+        errors["distance_km"] = "Renamed to 'distance' in version 2.0.0."
+    if not _is_number(distance):
+        errors["distance"] = "Must be a number."
+    elif distance < 0:
+        errors["distance"] = "Must not be negative."
 
     elevation_gain_m = data.get("elevation_gain_m")
     if not isinstance(elevation_gain_m, int) or isinstance(elevation_gain_m, bool):
@@ -52,7 +54,7 @@ def validate_route(data):
     return {
         "name": name,
         "region": region,
-        "distance_km": float(distance_km),
+        "distance": float(distance),
         "elevation_gain_m": elevation_gain_m,
         "difficulty": difficulty,
     }

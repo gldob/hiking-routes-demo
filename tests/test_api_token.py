@@ -2,7 +2,7 @@ import pytest
 from django.core.exceptions import ImproperlyConfigured
 from django.test import Client
 
-ROUTE = {"name": "Rigi", "region": "Schwyz", "distance_km": 7, "elevation_gain_m": 500, "difficulty": "T2"}
+ROUTE = {"name": "Rigi", "region": "Schwyz", "distance": 7, "elevation_gain_m": 500, "difficulty": "T2"}
 
 
 @pytest.mark.django_db

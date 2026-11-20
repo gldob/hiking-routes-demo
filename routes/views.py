@@ -52,7 +52,7 @@ def _parse_list_params(params):
     max_distance = params.get("max_distance")
     if max_distance is not None:
         try:
-            filters["distance_km__lte"] = float(max_distance)
+            filters["distance__lte"] = float(max_distance)
         except ValueError:
             errors["max_distance"] = "Must be a number."
 

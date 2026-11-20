@@ -22,7 +22,7 @@ class Route(models.Model):
 
     name = models.CharField(max_length=200)
     region = models.CharField(max_length=100)
-    distance_km = models.FloatField()
+    distance = models.FloatField()
     elevation_gain_m = models.PositiveIntegerField()
     difficulty = models.CharField(max_length=2, choices=Difficulty.choices)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -47,10 +47,10 @@ class Route(models.Model):
             "id": self.id,
             "name": self.name,
             "region": self.region,
-            "distance_km": self.distance_km,
+            "distance": self.distance,
             "elevation_gain_m": self.elevation_gain_m,
             "difficulty": self.difficulty,
-            "estimated_duration_min": estimated_duration_min(self.distance_km, self.elevation_gain_m),
+            "estimated_duration_min": estimated_duration_min(self.distance, self.elevation_gain_m),
             "rating_average": round(average, 1) if average is not None else None,
             "rating_count": count,
             "created_at": self.created_at.isoformat(),

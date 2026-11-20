@@ -3,7 +3,7 @@ import pytest
 VALID_ROUTE = {
     "name": "Pilatus via Fräkmüntegg",
     "region": "Luzern",
-    "distance_km": 11.2,
+    "distance": 11.2,
     "elevation_gain_m": 1450,
     "difficulty": "T3",
 }
@@ -43,8 +43,8 @@ def test_unknown_route_returns_404(client):
     [
         ("name", ""),
         ("region", None),
-        ("distance_km", "far"),
-        ("distance_km", -3.5),
+        ("distance", "far"),
+        ("distance", -3.5),
         ("elevation_gain_m", -10),
         ("difficulty", "T7"),
     ],
@@ -56,6 +56,25 @@ def test_invalid_route_is_rejected(client, field, value):
 
     assert response.status_code == 400
     assert field in response.json()["details"]
+
+
+@pytest.mark.django_db
+def test_old_field_name_distance_km_is_rejected(client):
+    payload = {key: value for key, value in VALID_ROUTE.items() if key != "distance"}
+    payload["distance_km"] = 11.2
+
+    response = client.post("/api/routes/", payload, content_type="application/json")
+
+    assert response.status_code == 400
+    assert set(response.json()["details"]) == {"distance", "distance_km"}
+
+
+@pytest.mark.django_db
+def test_route_has_no_distance_km_field(client):
+    body = client.post("/api/routes/", VALID_ROUTE, content_type="application/json").json()
+
+    assert "distance_km" not in body
+    assert body["distance"] == 11.2
 
 
 @pytest.mark.django_db
@@ -89,7 +108,7 @@ def test_invalid_page_is_rejected(client):
 
 @pytest.mark.django_db
 def test_route_includes_estimated_duration(client):
-    payload = {**VALID_ROUTE, "distance_km": 12, "elevation_gain_m": 600}
+    payload = {**VALID_ROUTE, "distance": 12, "elevation_gain_m": 600}
 
     body = client.post("/api/routes/", payload, content_type="application/json").json()
 
