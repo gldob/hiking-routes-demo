@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-11-20
+
+### Added
+
+- `GET /api/routes/` can be filtered with `?difficulty=<T1..T6>` and `?max_distance=<km>` (inclusive). Both filters can be combined; `count` and pagination refer to the filtered result. Invalid filter values return 400.
+
+### Fixed
+
+- Creating a route with a negative `distance_km` now returns 400 instead of 201. Existing routes are not changed.
+
 ## [1.0.0] - 2026-11-20
 
 First release.
@@ -15,4 +25,5 @@ First release.
 - `GET /health/` reports the running version, the database status and the number of pending migrations.
 - Docker image with gunicorn; migrations are applied on container start. Images are published to GHCR per tag.
 
+[1.1.0]: https://github.com/gldob/hiking-routes-demo/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/gldob/hiking-routes-demo/releases/tag/v1.0.0
