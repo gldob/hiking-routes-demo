@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [2.0.0] - 2026-11-20
+
+This is a major release with breaking changes for operators and API clients.
+
+### Breaking changes
+
+- **Write requests require a token.** `POST /api/routes/` and `POST /api/routes/<id>/ratings/` need the header `X-API-Token`; without it or with a wrong value they return 401. `GET` requests and `/health/` need no token.
+- **New required environment variable `API_TOKEN`.** The service does not start without it (`ImproperlyConfigured: Required environment variable API_TOKEN is not set.`).
+- **Field `distance_km` renamed to `distance`** in requests and responses (still kilometres). Sending `distance_km` returns 400.
+
+### Database
+
+- New migration `routes.0003_rename_distance_km_route_distance` renames the column `routes_route.distance_km` to `distance`. It runs on container start. Rolling back to v1.2.0 requires reverting it first (see RUNBOOK).
+
 ## [1.2.0] - 2026-11-20
 
 ### Added
@@ -37,6 +51,7 @@ First release.
 - `GET /health/` reports the running version, the database status and the number of pending migrations.
 - Docker image with gunicorn; migrations are applied on container start. Images are published to GHCR per tag.
 
+[2.0.0]: https://github.com/gldob/hiking-routes-demo/compare/v1.2.0...v2.0.0
 [1.2.0]: https://github.com/gldob/hiking-routes-demo/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/gldob/hiking-routes-demo/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/gldob/hiking-routes-demo/releases/tag/v1.0.0

@@ -1,6 +1,8 @@
-# Runbook: hiking-routes-demo v1.2.0
+# Runbook: hiking-routes-demo v2.0.0
 
 How to deploy, upgrade, check and roll back the service. All commands assume a Linux host with Docker and a POSIX shell.
+
+**v2.0.0 is a major release.** It needs a new required environment variable (`API_TOKEN`), contains a database migration and changes the API for clients. Read section 5 before upgrading.
 
 ## 1. Prerequisites
 
@@ -12,27 +14,27 @@ Set these shell variables once; all later commands use them:
 
 ```bash
 export IMAGE=ghcr.io/gldob/hiking-routes-demo
-export VERSION=v1.2.0
-export PREVIOUS=v1.1.0
+export VERSION=v2.0.0
+export PREVIOUS=v1.2.0
 export CONTAINER=hiking-routes
 export VOLUME=hiking-data
 export DJANGO_SECRET_KEY="<the value used for the running deployment>"
+export API_TOKEN="$(openssl rand -hex 32)"   # new in v2.0.0, keep it and hand it to API clients
 ```
 
-For a fresh install, generate a new key with `openssl rand -hex 32` and keep it.
+For a fresh install, also generate a new `DJANGO_SECRET_KEY` with `openssl rand -hex 32` and keep it.
 
 ## 2. Configuration
 
 | Variable | Required | Default | Purpose |
 | --- | --- | --- | --- |
 | `DJANGO_SECRET_KEY` | yes | – | Django secret key. Without it the container exits on start with `ImproperlyConfigured`. |
+| `API_TOKEN` | yes (**new in v2.0.0**) | – | Shared secret for write requests; clients send it in the header `X-API-Token`. Without it the container exits on start with `ImproperlyConfigured: Required environment variable API_TOKEN is not set.` |
 | `DJANGO_ALLOWED_HOSTS` | no | `*` | Comma-separated host names the service answers to. |
 | `DJANGO_DEBUG` | no | `0` | `1` enables Django debug mode. Never in production. |
 | `PORT` | no | `8000` | Port gunicorn listens on inside the container. |
 | `GUNICORN_WORKERS` | no | `2` | Number of gunicorn worker processes. |
 | `DATABASE_PATH` | no | `/data/db.sqlite3` | Location of the SQLite file. Keep it inside the volume. |
-
-No configuration changes compared to v1.1.0.
 
 ## 3. Deploy (fresh install)
 
@@ -43,11 +45,12 @@ docker run -d --name "$CONTAINER" \
   -p 8000:8000 \
   -v "$VOLUME":/data \
   -e DJANGO_SECRET_KEY="$DJANGO_SECRET_KEY" \
+  -e API_TOKEN="$API_TOKEN" \
   --restart unless-stopped \
   "$IMAGE:$VERSION"
 ```
 
-On start the container runs `python manage.py migrate` (migrations `routes.0001_initial` and `routes.0002_rating`), then starts gunicorn.
+On start the container runs `python manage.py migrate` (migrations `routes.0001` to `routes.0003`), then starts gunicorn.
 
 ## 4. Health check
 
@@ -58,47 +61,62 @@ curl -fsS http://localhost:8000/health/
 Expected answer (status 200):
 
 ```json
-{"status": "ok", "version": "1.2.0", "database": "ok", "pending_migrations": 0}
+{"status": "ok", "version": "2.0.0", "database": "ok", "pending_migrations": 0}
 ```
 
-If the call fails, read the logs with `docker logs "$CONTAINER"`.
+If the call fails, read the logs with `docker logs "$CONTAINER"`. If the container keeps restarting and the log shows `Required environment variable API_TOKEN is not set`, `API_TOKEN` was not passed.
 
-Smoke test for this release (replace `1` with the id of an existing route):
+Smoke test for this release:
 
 ```bash
-curl -fsS -X POST http://localhost:8000/api/routes/1/ratings/ \
-  -H 'Content-Type: application/json' -d '{"stars": 5}'
-curl -fsS http://localhost:8000/api/routes/1/
+# without token: 401
+curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:8000/api/routes/ \
+  -H 'Content-Type: application/json' \
+  -d '{"name": "Smoke test", "region": "Test", "distance": 5, "elevation_gain_m": 200, "difficulty": "T1"}'
+# with token: 201, the response contains "distance" and no "distance_km"
+curl -fsS -X POST http://localhost:8000/api/routes/ \
+  -H "X-API-Token: $API_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"name": "Smoke test", "region": "Test", "distance": 5, "elevation_gain_m": 200, "difficulty": "T1"}'
 ```
 
-The POST returns 201. The route shows `rating_count` of at least 1, a `rating_average` and `estimated_duration_min`.
+## 5. Upgrade from v1.2.0
 
-## 5. Upgrade from v1.1.0
+What changes for operations:
 
-This release contains a **database migration**: `routes.0002_rating` creates the new table `routes_rating`. Existing tables are not changed. The migration runs automatically on container start.
+- **New required variable `API_TOKEN`.** The container does not start without it.
+- **Database migration** `routes.0003_rename_distance_km_route_distance` renames the column `routes_route.distance_km` to `distance`. It runs automatically on container start. Values are kept.
+
+What changes for API clients (announce before the upgrade):
+
+- `POST` requests need the header `X-API-Token: <API_TOKEN>`, otherwise 401.
+- The field `distance_km` is now `distance` in requests and responses.
+
+Steps:
 
 1. Back up the database (section 6). Do not skip this step.
-2. Pull the new image:
+2. Generate and store `API_TOKEN` (section 1) and give it to the API clients that write data.
+3. Pull the new image:
    ```bash
    docker pull "$IMAGE:$VERSION"
    ```
-3. Replace the container, keeping volume and variables:
+4. Replace the container, keeping volume and variables and **adding `API_TOKEN`**:
    ```bash
    docker stop "$CONTAINER" && docker rm "$CONTAINER"
    docker run -d --name "$CONTAINER" \
      -p 8000:8000 \
      -v "$VOLUME":/data \
      -e DJANGO_SECRET_KEY="$DJANGO_SECRET_KEY" \
+     -e API_TOKEN="$API_TOKEN" \
      --restart unless-stopped \
      "$IMAGE:$VERSION"
    ```
-4. Check that the migration was applied:
+5. Check that the migration was applied:
    ```bash
-   docker logs "$CONTAINER" 2>&1 | grep "Applying routes.0002_rating"
+   docker logs "$CONTAINER" 2>&1 | grep "Applying routes.0003_rename_distance_km_route_distance"
    docker exec "$CONTAINER" python manage.py showmigrations routes
    ```
-   Both `0001_initial` and `0002_rating` are marked `[X]`.
-5. Run the health check (section 4); `version` must be `1.2.0` and `pending_migrations` must be `0`.
+   `0001_initial`, `0002_rating` and `0003_rename_distance_km_route_distance` are marked `[X]`.
+6. Run the health check and the smoke test (section 4); `version` must be `2.0.0`.
 
 ## 6. Backup
 
@@ -108,27 +126,28 @@ Before any change, copy the database file inside the volume:
 docker exec "$CONTAINER" cp /data/db.sqlite3 "/data/db.sqlite3.bak-$(date +%Y%m%d%H%M%S)"
 ```
 
-## 7. Rollback to v1.1.0
+## 7. Rollback to v1.2.0
 
-The migration has to be reverted **before** the image is switched, and it has to be reverted **with the v1.2.0 image**: the v1.1.0 image does not know migration `0002_rating` and cannot undo it.
+The migration has to be reverted **before** the image is switched, and it has to be reverted **with the v2.0.0 image**: the v1.2.0 image does not know migration `0003` and would fail with 500 on every route request because the column is named `distance`.
 
-Reverting drops the table `routes_rating`, so **all ratings are lost**. Routes are kept unchanged.
+Reverting renames the column back to `distance_km`. No data is lost; routes and ratings are kept.
 
 1. Back up the database (section 6).
 2. Stop the running container:
    ```bash
    docker stop "$CONTAINER" && docker rm "$CONTAINER"
    ```
-3. Revert the migration with the current image:
+3. Revert the migration with the current image (it needs both variables to start):
    ```bash
    docker run --rm \
      -v "$VOLUME":/data \
      -e DJANGO_SECRET_KEY="$DJANGO_SECRET_KEY" \
+     -e API_TOKEN="$API_TOKEN" \
      "$IMAGE:$VERSION" \
-     python manage.py migrate routes 0001
+     python manage.py migrate routes 0002
    ```
-   The output ends with `Unapplying routes.0002_rating... OK`.
-4. Start the previous version:
+   The output ends with `Unapplying routes.0003_rename_distance_km_route_distance... OK`.
+4. Start the previous version (`API_TOKEN` is not needed by v1.2.0):
    ```bash
    docker run -d --name "$CONTAINER" \
      -p 8000:8000 \
@@ -137,4 +156,4 @@ Reverting drops the table `routes_rating`, so **all ratings are lost**. Routes a
      --restart unless-stopped \
      "$IMAGE:$PREVIOUS"
    ```
-5. Run the health check; `version` must be `1.1.0`. `GET /api/routes/` returns all routes that existed before the rollback, without rating fields.
+5. Run the health check; `version` must be `1.2.0`. Routes show `distance_km` again, and `POST` works without a token.
