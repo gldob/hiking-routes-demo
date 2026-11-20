@@ -56,3 +56,24 @@ def validate_route(data):
         "elevation_gain_m": elevation_gain_m,
         "difficulty": difficulty,
     }
+
+
+def validate_rating(data):
+    """Validate a JSON payload for a new rating and return the cleaned fields."""
+    if not isinstance(data, dict):
+        raise ValidationError({"body": "Expected a JSON object."})
+
+    errors = {}
+    stars = data.get("stars")
+    if not isinstance(stars, int) or isinstance(stars, bool) or not 1 <= stars <= 5:
+        errors["stars"] = "Must be an integer from 1 to 5."
+
+    comment = data.get("comment", "")
+    if not isinstance(comment, str):
+        errors["comment"] = "Must be a string."
+    elif len(comment) > 500:
+        errors["comment"] = "At most 500 characters."
+
+    if errors:
+        raise ValidationError(errors)
+    return {"stars": stars, "comment": comment.strip()}

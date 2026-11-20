@@ -3,8 +3,8 @@ import json
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_http_methods
 
-from routes.models import Route
-from routes.validation import ValidationError, validate_route
+from routes.models import Rating, Route
+from routes.validation import ValidationError, validate_rating, validate_route
 
 PAGE_SIZE = 20
 
@@ -65,7 +65,7 @@ def _list_routes(request):
     except ValidationError as exc:
         return _error(400, "validation_failed", details=exc.errors)
 
-    routes = Route.objects.filter(**filters)
+    routes = Route.objects.with_rating_stats().filter(**filters)
     start = (page - 1) * PAGE_SIZE
     return JsonResponse(
         {
@@ -88,7 +88,24 @@ def _create_route(request):
 
 @require_GET
 def route_detail(request, route_id):
-    route = Route.objects.filter(pk=route_id).first()
+    route = Route.objects.with_rating_stats().filter(pk=route_id).first()
     if route is None:
         return _error(404, "not_found")
     return JsonResponse(route.to_dict())
+
+
+@require_http_methods(["GET", "POST"])
+def route_ratings(request, route_id):
+    route = Route.objects.filter(pk=route_id).first()
+    if route is None:
+        return _error(404, "not_found")
+
+    if request.method == "POST":
+        try:
+            fields = validate_rating(_parse_json(request))
+        except ValidationError as exc:
+            return _error(400, "validation_failed", details=exc.errors)
+        rating = Rating.objects.create(route=route, **fields)
+        return JsonResponse(rating.to_dict(), status=201)
+
+    return JsonResponse({"results": [rating.to_dict() for rating in route.ratings.all()]})
