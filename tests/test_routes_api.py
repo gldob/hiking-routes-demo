@@ -66,18 +66,18 @@ def test_invalid_json_is_rejected(client):
     assert response.json()["details"] == {"body": "Invalid JSON."}
 
 
-def test_list_is_paginated_with_20_routes_per_page(client, make_route):
-    for i in range(25):
+def test_list_is_paginated(client, make_route):
+    for i in range(15):
         make_route(name=f"Route {i}")
 
     first = client.get("/api/routes/").json()
     second = client.get("/api/routes/?page=2").json()
 
-    assert first["count"] == 25
-    assert first["page_size"] == 20
-    assert len(first["results"]) == 20
+    assert first["count"] == 15
+    assert first["page_size"] == 10
+    assert len(first["results"]) == 10
     assert len(second["results"]) == 5
-    assert second["results"][0]["name"] == "Route 20"
+    assert second["results"][0]["name"] == "Route 10"
 
 
 @pytest.mark.django_db

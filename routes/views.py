@@ -6,7 +6,7 @@ from django.views.decorators.http import require_GET, require_http_methods
 from routes.models import Rating, Route
 from routes.validation import ValidationError, validate_rating, validate_route
 
-PAGE_SIZE = 20
+PAGE_SIZE = 10
 
 
 def _error(status, error, **extra):
@@ -66,13 +66,14 @@ def _list_routes(request):
         return _error(400, "validation_failed", details=exc.errors)
 
     routes = Route.objects.with_rating_stats().filter(**filters)
-    start = (page - 1) * PAGE_SIZE
+    offset = (page - 1) * PAGE_SIZE
+    page_routes = routes[offset : offset + PAGE_SIZE]
     return JsonResponse(
         {
             "count": routes.count(),
             "page": page,
             "page_size": PAGE_SIZE,
-            "results": [route.to_dict() for route in routes[start : start + PAGE_SIZE]],
+            "results": [route.to_dict() for route in page_routes],
         }
     )
 
