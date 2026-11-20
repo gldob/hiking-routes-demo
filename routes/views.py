@@ -27,15 +27,45 @@ def route_collection(request):
     return _list_routes(request)
 
 
-def _list_routes(request):
+def _parse_list_params(params):
+    """Read ?page, ?difficulty and ?max_distance from the query string."""
+    errors = {}
+    filters = {}
+
     try:
-        page = int(request.GET.get("page", "1"))
+        page = int(params.get("page", "1"))
         if page < 1:
             raise ValueError
     except ValueError:
-        return _error(400, "validation_failed", details={"page": "Must be a positive integer."})
+        errors["page"] = "Must be a positive integer."
+        page = None
 
-    routes = Route.objects.all()
+    difficulty = params.get("difficulty")
+    if difficulty is not None:
+        if difficulty in Route.Difficulty.values:
+            filters["difficulty"] = difficulty
+        else:
+            errors["difficulty"] = "Must be one of " + ", ".join(Route.Difficulty.values) + "."
+
+    max_distance = params.get("max_distance")
+    if max_distance is not None:
+        try:
+            filters["distance_km__lte"] = float(max_distance)
+        except ValueError:
+            errors["max_distance"] = "Must be a number."
+
+    if errors:
+        raise ValidationError(errors)
+    return page, filters
+
+
+def _list_routes(request):
+    try:
+        page, filters = _parse_list_params(request.GET)
+    except ValidationError as exc:
+        return _error(400, "validation_failed", details=exc.errors)
+
+    routes = Route.objects.filter(**filters)
     start = (page - 1) * PAGE_SIZE
     return JsonResponse(
         {
