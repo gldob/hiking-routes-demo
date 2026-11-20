@@ -12,6 +12,8 @@ The service is the test object for the Release Runbook Agent (HSLU DLM03 H26). E
 | GET | `/api/routes/` | List routes, 20 per page (`?page=N`); filter with `?difficulty=T2` and `?max_distance=10` (km, inclusive) |
 | POST | `/api/routes/` | Create a route |
 | GET | `/api/routes/<id>/` | One route |
+| GET | `/api/routes/<id>/ratings/` | Ratings of a route |
+| POST | `/api/routes/<id>/ratings/` | Rate a route: `{"stars": 1-5, "comment": "..."}` |
 
 A route looks like this:
 
@@ -23,11 +25,14 @@ A route looks like this:
   "distance_km": 11.2,
   "elevation_gain_m": 1450,
   "difficulty": "T3",
+  "estimated_duration_min": 375,
+  "rating_average": 4.5,
+  "rating_count": 2,
   "created_at": "2026-11-20T10:15:00.123456+00:00"
 }
 ```
 
-`difficulty` uses the SAC hiking scale `T1` to `T6`. The list response wraps the routes:
+`difficulty` uses the SAC hiking scale `T1` to `T6`. `estimated_duration_min` is the walking time after DIN 33466 (4 km/h on the flat, 300 m/h ascent; the larger partial time plus half of the smaller one, rounded to 5 minutes). `rating_average` is `null` while a route has no ratings. The list response wraps the routes:
 
 ```json
 {"count": 25, "page": 1, "page_size": 20, "results": [...]}

@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [1.2.0] - 2026-11-20
+
+### Added
+
+- Ratings: `POST /api/routes/<id>/ratings/` with `{"stars": 1-5, "comment": "..."}` rates a route (201); `GET /api/routes/<id>/ratings/` lists its ratings. Invalid `stars` return 400, unknown routes 404.
+- Routes include `rating_average` (one decimal, `null` without ratings) and `rating_count`.
+- Routes include `estimated_duration_min`, the walking time after DIN 33466 (4 km/h, 300 m ascent/h, larger time plus half of the smaller, rounded to 5 minutes). Example: 12 km and 600 m give 240.
+
+### Database
+
+- New migration `routes.0002_rating` creates the table `routes_rating`. It runs on container start. Rolling back to v1.1.0 requires reverting it first (see RUNBOOK), which deletes all ratings.
+
 ## [1.1.0] - 2026-11-20
 
 ### Added
@@ -25,5 +37,6 @@ First release.
 - `GET /health/` reports the running version, the database status and the number of pending migrations.
 - Docker image with gunicorn; migrations are applied on container start. Images are published to GHCR per tag.
 
+[1.2.0]: https://github.com/gldob/hiking-routes-demo/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/gldob/hiking-routes-demo/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/gldob/hiking-routes-demo/releases/tag/v1.0.0
