@@ -9,7 +9,7 @@ The service is the test object for the Release Runbook Agent (HSLU DLM03 H26). E
 | Method | Path | Description |
 | --- | --- | --- |
 | GET | `/health/` | Version, database status, number of pending migrations |
-| GET | `/api/routes/` | List routes, 20 per page (`?page=N`) |
+| GET | `/api/routes/` | List routes, 20 per page (`?page=N`); filter with `?difficulty=T2` and `?max_distance=10` (km, inclusive) |
 | POST | `/api/routes/` | Create a route |
 | GET | `/api/routes/<id>/` | One route |
 

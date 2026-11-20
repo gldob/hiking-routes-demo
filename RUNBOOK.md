@@ -1,6 +1,6 @@
-# Runbook: hiking-routes-demo v1.0.0
+# Runbook: hiking-routes-demo v1.1.0
 
-How to deploy, check and remove the service. All commands assume a Linux host with Docker and a POSIX shell.
+How to deploy, upgrade, check and roll back the service. All commands assume a Linux host with Docker and a POSIX shell.
 
 ## 1. Prerequisites
 
@@ -12,11 +12,14 @@ Set these shell variables once; all later commands use them:
 
 ```bash
 export IMAGE=ghcr.io/gldob/hiking-routes-demo
-export VERSION=v1.0.0
+export VERSION=v1.1.0
+export PREVIOUS=v1.0.0
 export CONTAINER=hiking-routes
 export VOLUME=hiking-data
-export DJANGO_SECRET_KEY="$(openssl rand -hex 32)"   # keep this value, reuse it for every later deployment
+export DJANGO_SECRET_KEY="<the value used for the running deployment>"
 ```
+
+For a fresh install, generate a new key with `openssl rand -hex 32` and keep it.
 
 ## 2. Configuration
 
@@ -29,7 +32,7 @@ export DJANGO_SECRET_KEY="$(openssl rand -hex 32)"   # keep this value, reuse it
 | `GUNICORN_WORKERS` | no | `2` | Number of gunicorn worker processes. |
 | `DATABASE_PATH` | no | `/data/db.sqlite3` | Location of the SQLite file. Keep it inside the volume. |
 
-Data lives in the SQLite file in the Docker volume mounted at `/data`. Losing the volume loses all routes.
+No configuration changes compared to v1.0.0.
 
 ## 3. Deploy (fresh install)
 
@@ -44,7 +47,7 @@ docker run -d --name "$CONTAINER" \
   "$IMAGE:$VERSION"
 ```
 
-On start the container runs `python manage.py migrate` and creates the table `routes_route` (migration `routes.0001_initial`), then starts gunicorn.
+On start the container runs `python manage.py migrate`, then starts gunicorn.
 
 ## 4. Health check
 
@@ -55,40 +58,66 @@ curl -fsS http://localhost:8000/health/
 Expected answer (status 200):
 
 ```json
-{"status": "ok", "version": "1.0.0", "database": "ok", "pending_migrations": 0}
+{"status": "ok", "version": "1.1.0", "database": "ok", "pending_migrations": 0}
 ```
 
 If the call fails, read the logs with `docker logs "$CONTAINER"`.
 
-Smoke test:
+Smoke test for this release:
 
 ```bash
-curl -fsS -X POST http://localhost:8000/api/routes/ \
+curl -fsS "http://localhost:8000/api/routes/?difficulty=T1&max_distance=10"
+curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:8000/api/routes/ \
   -H 'Content-Type: application/json' \
-  -d '{"name": "Smoke test", "region": "Test", "distance_km": 5, "elevation_gain_m": 200, "difficulty": "T1"}'
-curl -fsS http://localhost:8000/api/routes/
+  -d '{"name": "Smoke test", "region": "Test", "distance_km": -1, "elevation_gain_m": 0, "difficulty": "T1"}'
 ```
 
-The POST returns 201, the list contains the new route.
+The first call returns 200 with only T1 routes of at most 10 km. The second prints `400`.
 
-## 5. Upgrade
+## 5. Upgrade from v1.0.0
 
-Not applicable: v1.0.0 is the first release.
+This release has no database migration and no new configuration. The upgrade is an image swap.
+
+1. Back up the database (section 6).
+2. Pull the new image:
+   ```bash
+   docker pull "$IMAGE:$VERSION"
+   ```
+3. Replace the container, keeping volume and variables:
+   ```bash
+   docker stop "$CONTAINER" && docker rm "$CONTAINER"
+   docker run -d --name "$CONTAINER" \
+     -p 8000:8000 \
+     -v "$VOLUME":/data \
+     -e DJANGO_SECRET_KEY="$DJANGO_SECRET_KEY" \
+     --restart unless-stopped \
+     "$IMAGE:$VERSION"
+   ```
+4. Run the health check (section 4); `version` must be `1.1.0`.
+
+Behaviour change to tell API clients: a negative `distance_km` is now rejected with 400.
 
 ## 6. Backup
 
 Before any change, copy the database file inside the volume:
 
 ```bash
-docker exec "$CONTAINER" cp /data/db.sqlite3 "/data/db.sqlite3.bak-$VERSION"
+docker exec "$CONTAINER" cp /data/db.sqlite3 "/data/db.sqlite3.bak-$(date +%Y%m%d%H%M%S)"
 ```
 
-## 7. Rollback / removal
+## 7. Rollback to v1.0.0
 
-There is no earlier version to roll back to. To remove the service and keep the data:
+No migration to revert. Swap the image back:
 
 ```bash
 docker stop "$CONTAINER" && docker rm "$CONTAINER"
+docker run -d --name "$CONTAINER" \
+  -p 8000:8000 \
+  -v "$VOLUME":/data \
+  -e DJANGO_SECRET_KEY="$DJANGO_SECRET_KEY" \
+  --restart unless-stopped \
+  "$IMAGE:$PREVIOUS"
+curl -fsS http://localhost:8000/health/
 ```
 
-To also delete all data: `docker volume rm "$VOLUME"`.
+`version` must be `1.0.0`. All routes created with v1.1.0 remain available.
