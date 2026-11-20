@@ -7,6 +7,7 @@ All notable changes to this project are documented here. The format follows [Kee
 ### Added
 
 - `GET /api/routes/` can be filtered with `?difficulty=<T1..T6>` and `?max_distance=<km>` (inclusive). Both filters can be combined; `count` and pagination refer to the filtered result. Invalid filter values return 400.
+- `GET /api/routes/` can be filtered by region with `?region=<name>`, for example `?region=Luzern`. The match is exact and case-sensitive.
 
 ### Fixed
 
