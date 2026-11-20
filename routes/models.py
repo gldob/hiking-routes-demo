@@ -1,6 +1,8 @@
 from django.db import models
 from django.db.models import Avg, Count, Q
 
+from routes.hiking_time import estimated_duration_min
+
 
 class RouteQuerySet(models.QuerySet):
     def with_rating_stats(self):
@@ -48,6 +50,7 @@ class Route(models.Model):
             "distance_km": self.distance_km,
             "elevation_gain_m": self.elevation_gain_m,
             "difficulty": self.difficulty,
+            "estimated_duration_min": estimated_duration_min(self.distance_km, self.elevation_gain_m),
             "rating_average": round(average, 1) if average is not None else None,
             "rating_count": count,
             "created_at": self.created_at.isoformat(),
