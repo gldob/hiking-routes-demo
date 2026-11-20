@@ -2,7 +2,7 @@
 
 How to deploy, upgrade, check and roll back the service. All commands assume a Linux host with Docker and a POSIX shell.
 
-**v2.0.0 is a major release.** It needs a new required environment variable (`API_TOKEN`), contains a database migration and changes the API for clients. Read section 5 before upgrading.
+**v2.0.0 is a major release.** It contains a database migration and changes the API for clients. Read section 5 before upgrading.
 
 ## 1. Prerequisites
 
@@ -19,7 +19,6 @@ export PREVIOUS=v1.2.0
 export CONTAINER=hiking-routes
 export VOLUME=hiking-data
 export DJANGO_SECRET_KEY="<the value used for the running deployment>"
-export API_TOKEN="$(openssl rand -hex 32)"   # new in v2.0.0, keep it and hand it to API clients
 ```
 
 For a fresh install, also generate a new `DJANGO_SECRET_KEY` with `openssl rand -hex 32` and keep it.
@@ -29,7 +28,6 @@ For a fresh install, also generate a new `DJANGO_SECRET_KEY` with `openssl rand 
 | Variable | Required | Default | Purpose |
 | --- | --- | --- | --- |
 | `DJANGO_SECRET_KEY` | yes | – | Django secret key. Without it the container exits on start with `ImproperlyConfigured`. |
-| `API_TOKEN` | yes (**new in v2.0.0**) | – | Shared secret for write requests; clients send it in the header `X-API-Token`. Without it the container exits on start with `ImproperlyConfigured: Required environment variable API_TOKEN is not set.` |
 | `DJANGO_ALLOWED_HOSTS` | no | `*` | Comma-separated host names the service answers to. |
 | `DJANGO_DEBUG` | no | `0` | `1` enables Django debug mode. Never in production. |
 | `PORT` | no | `8000` | Port gunicorn listens on inside the container. |
@@ -45,7 +43,6 @@ docker run -d --name "$CONTAINER" \
   -p 8000:8000 \
   -v "$VOLUME":/data \
   -e DJANGO_SECRET_KEY="$DJANGO_SECRET_KEY" \
-  -e API_TOKEN="$API_TOKEN" \
   --restart unless-stopped \
   "$IMAGE:$VERSION"
 ```
@@ -64,7 +61,7 @@ Expected answer (status 200):
 {"status": "ok", "version": "2.0.0", "database": "ok", "pending_migrations": 0}
 ```
 
-If the call fails, read the logs with `docker logs "$CONTAINER"`. If the container keeps restarting and the log shows `Required environment variable API_TOKEN is not set`, `API_TOKEN` was not passed.
+If the call fails, read the logs with `docker logs "$CONTAINER"`.
 
 Smoke test for this release:
 
@@ -75,7 +72,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:8000/api/route
   -d '{"name": "Smoke test", "region": "Test", "distance": 5, "elevation_gain_m": 200, "difficulty": "T1"}'
 # with token: 201, the response contains "distance" and no "distance_km"
 curl -fsS -X POST http://localhost:8000/api/routes/ \
-  -H "X-API-Token: $API_TOKEN" -H 'Content-Type: application/json' \
+  -H "X-API-Token: <token>" -H 'Content-Type: application/json' \
   -d '{"name": "Smoke test", "region": "Test", "distance": 5, "elevation_gain_m": 200, "difficulty": "T1"}'
 ```
 
@@ -83,40 +80,37 @@ curl -fsS -X POST http://localhost:8000/api/routes/ \
 
 What changes for operations:
 
-- **New required variable `API_TOKEN`.** The container does not start without it.
 - **Database migration** `routes.0003_rename_distance_km_route_distance` renames the column `routes_route.distance_km` to `distance`. It runs automatically on container start. Values are kept.
 
 What changes for API clients (announce before the upgrade):
 
-- `POST` requests need the header `X-API-Token: <API_TOKEN>`, otherwise 401.
+- `POST` requests need the header `X-API-Token`, otherwise 401.
 - The field `distance_km` is now `distance` in requests and responses.
 
 Steps:
 
 1. Back up the database (section 6). Do not skip this step.
-2. Generate and store `API_TOKEN` (section 1) and give it to the API clients that write data.
-3. Pull the new image:
+2. Pull the new image:
    ```bash
    docker pull "$IMAGE:$VERSION"
    ```
-4. Replace the container, keeping volume and variables and **adding `API_TOKEN`**:
+3. Replace the container, keeping volume and variables:
    ```bash
    docker stop "$CONTAINER" && docker rm "$CONTAINER"
    docker run -d --name "$CONTAINER" \
      -p 8000:8000 \
      -v "$VOLUME":/data \
      -e DJANGO_SECRET_KEY="$DJANGO_SECRET_KEY" \
-     -e API_TOKEN="$API_TOKEN" \
      --restart unless-stopped \
      "$IMAGE:$VERSION"
    ```
-5. Check that the migration was applied:
+4. Check that the migration was applied:
    ```bash
    docker logs "$CONTAINER" 2>&1 | grep "Applying routes.0003_rename_distance_km_route_distance"
    docker exec "$CONTAINER" python manage.py showmigrations routes
    ```
    `0001_initial`, `0002_rating` and `0003_rename_distance_km_route_distance` are marked `[X]`.
-6. Run the health check and the smoke test (section 4); `version` must be `2.0.0`.
+5. Run the health check and the smoke test (section 4); `version` must be `2.0.0`.
 
 ## 6. Backup
 
@@ -137,17 +131,16 @@ Reverting renames the column back to `distance_km`. No data is lost; routes and 
    ```bash
    docker stop "$CONTAINER" && docker rm "$CONTAINER"
    ```
-3. Revert the migration with the current image (it needs both variables to start):
+3. Revert the migration with the current image:
    ```bash
    docker run --rm \
      -v "$VOLUME":/data \
      -e DJANGO_SECRET_KEY="$DJANGO_SECRET_KEY" \
-     -e API_TOKEN="$API_TOKEN" \
      "$IMAGE:$VERSION" \
      python manage.py migrate routes 0002
    ```
    The output ends with `Unapplying routes.0003_rename_distance_km_route_distance... OK`.
-4. Start the previous version (`API_TOKEN` is not needed by v1.2.0):
+4. Start the previous version:
    ```bash
    docker run -d --name "$CONTAINER" \
      -p 8000:8000 \
