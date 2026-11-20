@@ -85,3 +85,12 @@ def test_invalid_page_is_rejected(client):
     response = client.get("/api/routes/?page=0")
 
     assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_route_includes_estimated_duration(client):
+    payload = {**VALID_ROUTE, "distance_km": 12, "elevation_gain_m": 600}
+
+    body = client.post("/api/routes/", payload, content_type="application/json").json()
+
+    assert body["estimated_duration_min"] == 240
