@@ -19,6 +19,8 @@ def _require_env(name):
 
 
 SECRET_KEY = _require_env("DJANGO_SECRET_KEY")
+# Shared secret for write access to the API (header X-API-Token).
+API_TOKEN = _require_env("API_TOKEN")
 DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
 ALLOWED_HOSTS = [
     host.strip()

@@ -3,6 +3,7 @@ import json
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_http_methods
 
+from routes.auth import token_required_for_writes
 from routes.models import Rating, Route
 from routes.validation import ValidationError, validate_rating, validate_route
 
@@ -21,6 +22,7 @@ def _parse_json(request):
 
 
 @require_http_methods(["GET", "POST"])
+@token_required_for_writes
 def route_collection(request):
     if request.method == "POST":
         return _create_route(request)
@@ -95,6 +97,7 @@ def route_detail(request, route_id):
 
 
 @require_http_methods(["GET", "POST"])
+@token_required_for_writes
 def route_ratings(request, route_id):
     route = Route.objects.filter(pk=route_id).first()
     if route is None:

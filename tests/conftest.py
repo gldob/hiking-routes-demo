@@ -1,6 +1,19 @@
 import pytest
+from django.conf import settings
+from django.test import Client
 
 from routes.models import Route
+
+
+@pytest.fixture
+def client():
+    """Test client that sends a valid API token with every request."""
+    return Client(headers={"X-API-Token": settings.API_TOKEN})
+
+
+@pytest.fixture
+def anonymous_client():
+    return Client()
 
 
 @pytest.fixture
