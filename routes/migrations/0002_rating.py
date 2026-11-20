@@ -10,19 +10,29 @@ class Migration(migrations.Migration):
         ('routes', '0001_initial'),
     ]
 
+    # The table is created with explicit SQL so that the CHECK constraint and
+    # the index are exactly what we expect in SQLite.
     operations = [
-        migrations.CreateModel(
-            name='Rating',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('stars', models.PositiveSmallIntegerField()),
-                ('comment', models.CharField(blank=True, default='', max_length=500)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('route', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='ratings', to='routes.route')),
+        migrations.RunSQL(
+            sql=[
+                '''CREATE TABLE "routes_rating" ("id" integer NOT NULL PRIMARY KEY AUTOINCREMENT, "stars" smallint unsigned NOT NULL CHECK ("stars" >= 0), "comment" varchar(500) NOT NULL, "created_at" datetime NOT NULL, "route_id" bigint NOT NULL REFERENCES "routes_route" ("id") DEFERRABLE INITIALLY DEFERRED, CONSTRAINT "rating_stars_between_1_and_5" CHECK (("stars" >= 1 AND "stars" <= 5)));''',
+                '''CREATE INDEX "routes_rating_route_id_178dde7c" ON "routes_rating" ("route_id");''',
             ],
-            options={
-                'ordering': ['id'],
-                'constraints': [models.CheckConstraint(condition=models.Q(('stars__gte', 1), ('stars__lte', 5)), name='rating_stars_between_1_and_5')],
-            },
+            state_operations=[
+                migrations.CreateModel(
+                    name='Rating',
+                    fields=[
+                        ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                        ('stars', models.PositiveSmallIntegerField()),
+                        ('comment', models.CharField(blank=True, default='', max_length=500)),
+                        ('created_at', models.DateTimeField(auto_now_add=True)),
+                        ('route', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='ratings', to='routes.route')),
+                    ],
+                    options={
+                        'ordering': ['id'],
+                        'constraints': [models.CheckConstraint(condition=models.Q(('stars__gte', 1), ('stars__lte', 5)), name='rating_stars_between_1_and_5')],
+                    },
+                ),
+            ],
         ),
     ]
