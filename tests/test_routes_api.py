@@ -44,6 +44,7 @@ def test_unknown_route_returns_404(client):
         ("name", ""),
         ("region", None),
         ("distance_km", "far"),
+        ("distance_km", -3.5),
         ("elevation_gain_m", -10),
         ("difficulty", "T7"),
     ],

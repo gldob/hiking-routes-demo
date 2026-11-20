@@ -33,6 +33,8 @@ def validate_route(data):
     distance_km = data.get("distance_km")
     if not _is_number(distance_km):
         errors["distance_km"] = "Must be a number."
+    elif distance_km < 0:
+        errors["distance_km"] = "Must not be negative."
 
     elevation_gain_m = data.get("elevation_gain_m")
     if not isinstance(elevation_gain_m, int) or isinstance(elevation_gain_m, bool):
