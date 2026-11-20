@@ -1,9 +1,10 @@
-from django.urls import path
+from django.urls import include, path
 
 from hiking.views import health
 
 urlpatterns = [
     path("health/", health),
+    path("api/", include("routes.urls")),
 ]
 
 handler404 = "hiking.views.not_found"
