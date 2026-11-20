@@ -22,7 +22,7 @@ def make_route(db):
         fields = {
             "name": "Hoher Kasten",
             "region": "Appenzell",
-            "distance_km": 8.5,
+            "distance": 8.5,
             "elevation_gain_m": 650,
             "difficulty": "T2",
         }

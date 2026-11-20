@@ -3,11 +3,11 @@ import pytest
 
 @pytest.fixture
 def routes(make_route):
-    make_route(name="Easy short", difficulty="T1", distance_km=4.0)
-    make_route(name="Medium short", difficulty="T2", distance_km=9.5)
-    make_route(name="Medium exactly ten", difficulty="T2", distance_km=10.0)
-    make_route(name="Medium long", difficulty="T2", distance_km=18.0)
-    make_route(name="Hard short", difficulty="T4", distance_km=6.0)
+    make_route(name="Easy short", difficulty="T1", distance=4.0)
+    make_route(name="Medium short", difficulty="T2", distance=9.5)
+    make_route(name="Medium exactly ten", difficulty="T2", distance=10.0)
+    make_route(name="Medium long", difficulty="T2", distance=18.0)
+    make_route(name="Hard short", difficulty="T4", distance=6.0)
 
 
 def names(response):
